@@ -37,7 +37,28 @@ theme =
         (hsl 29 0.90 0.15)
     , white = (hex "ffffff")
     }
+logoBannerHeight : Px
+logoBannerHeight = (px 65)
 
+type Padding
+  = Px0 | Px1 | Px2 | Px3 | Px4 | Px5
+  | Py0 | Py1 | Py2 | Py3 | Py4 | Py5
+padding : Padding -> Style
+padding a = 
+  Css.batch <|
+    case a of
+      Px0 -> [ paddingLeft (rem 0   ), paddingRight (rem 0   ) ]
+      Px1 -> [ paddingLeft (rem 0.25), paddingRight (rem 0.25) ]
+      Px2 -> [ paddingLeft (rem 0.5 ), paddingRight (rem 0.5 ) ]
+      Px3 -> [ paddingLeft (rem 1   ), paddingRight (rem 1   ) ]
+      Px4 -> [ paddingLeft (rem 1.5 ), paddingRight (rem 1.5 ) ]
+      Px5 -> [ paddingLeft (rem 3   ), paddingRight (rem 3   ) ]
+      Py0 -> [ paddingTop (rem 0   ), paddingBottom (rem 0   ) ]
+      Py1 -> [ paddingTop (rem 0.25), paddingBottom (rem 0.25) ]
+      Py2 -> [ paddingTop (rem 0.5 ), paddingBottom (rem 0.5 ) ]
+      Py3 -> [ paddingTop (rem 1   ), paddingBottom (rem 1   ) ]
+      Py4 -> [ paddingTop (rem 1.5 ), paddingBottom (rem 1.5 ) ]
+      Py5 -> [ paddingTop (rem 3   ), paddingBottom (rem 3   ) ]
 
 {-| A reusable button which has some styles pre-applied to it.
 -}
@@ -79,7 +100,7 @@ view model =
         ]
     , class "viewport"
     ]
-    [ helpBanner
+    [ logoBanner
     , puzzleContent
     , puzzleInput
     , hintSection
@@ -88,18 +109,69 @@ view model =
 --    , button [ onClick Increment ] [ text "++" ]
     ]
 
-helpBanner : Html msg
-helpBanner = 
+logoBanner : Html msg
+logoBanner = 
   div 
-    [ css 
-        [ displayFlex
-        , height (pct 10)
+    [ 
+      css 
+        [ property "display" "grid"
+        , property "grid-template-columns" "45% auto 45%"
+        , property "justify-items" "center"
+        , padding Py2
+        , alignItems center
+        , height logoBannerHeight
         , hover
             [ backgroundColor theme.primary.l1
             ]
         ]
     ]
-    [ text "Hi!" ]
+    [ yourDailyPlayerText
+    , helpButton
+    , fbPlayerLogo
+    ]
+
+
+fbPlayerLogo : Html msg
+fbPlayerLogo =
+    div 
+      []
+      [ img 
+        [ src "/fbplayer2.png" 
+        , css 
+            [ width auto 
+            , height logoBannerHeight
+            ]
+        ] [] ]
+
+helpButton : Html msg
+helpButton =
+    div 
+      [ css
+        [ borderRadius (pct 50)
+        , displayFlex
+        , alignItems center
+        , justifyContent center
+        , width (px 30)
+        , height (px 30)
+        , backgroundColor theme.primary.l4
+        , color theme.white
+        ]
+      ]
+      [ text "?" ]
+
+
+yourDailyPlayerText : Html msg
+yourDailyPlayerText =
+    div 
+      [ css
+        [ transform (rotate (deg -30))
+        ]
+      ]
+      [ div [ css [ color theme.secondary.l3, textAlign center ]] [ text "Your Daily"]
+      , div [ css [ color theme.white, backgroundColor theme.primary.l4, textAlign center, padding Px4 ]] [ text "Player"]
+      ]
+
+  
 
 puzzleContent : Html msg
 puzzleContent = 
