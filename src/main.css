@@ -1,4 +1,5 @@
 .viewport {
+    position: relative;
     width: 320px;
     height: 500px;
     border: 1px solid black;

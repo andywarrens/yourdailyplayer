@@ -37,28 +37,51 @@ theme =
         (hsl 29 0.90 0.15)
     , white = (hex "ffffff")
     }
-logoBannerHeight : Px
-logoBannerHeight = (px 65)
 
-type Padding
-  = Px0 | Px1 | Px2 | Px3 | Px4 | Px5
-  | Py0 | Py1 | Py2 | Py3 | Py4 | Py5
-padding : Padding -> Style
-padding a = 
-  Css.batch <|
-    case a of
-      Px0 -> [ paddingLeft (rem 0   ), paddingRight (rem 0   ) ]
-      Px1 -> [ paddingLeft (rem 0.25), paddingRight (rem 0.25) ]
-      Px2 -> [ paddingLeft (rem 0.5 ), paddingRight (rem 0.5 ) ]
-      Px3 -> [ paddingLeft (rem 1   ), paddingRight (rem 1   ) ]
-      Px4 -> [ paddingLeft (rem 1.5 ), paddingRight (rem 1.5 ) ]
-      Px5 -> [ paddingLeft (rem 3   ), paddingRight (rem 3   ) ]
-      Py0 -> [ paddingTop (rem 0   ), paddingBottom (rem 0   ) ]
-      Py1 -> [ paddingTop (rem 0.25), paddingBottom (rem 0.25) ]
-      Py2 -> [ paddingTop (rem 0.5 ), paddingBottom (rem 0.5 ) ]
-      Py3 -> [ paddingTop (rem 1   ), paddingBottom (rem 1   ) ]
-      Py4 -> [ paddingTop (rem 1.5 ), paddingBottom (rem 1.5 ) ]
-      Py5 -> [ paddingTop (rem 3   ), paddingBottom (rem 3   ) ]
+appSize : { logoBannerHeight : Px, hintBannerHeight : Px }
+appSize = 
+  { logoBannerHeight = (px 65)
+  , hintBannerHeight = (px 55)
+  }
+
+type Direction = 
+    Top | Right | Bottom | Left 
+  | X | Y
+size : Int -> Float
+size sizeP = case sizeP of
+    0 -> 0
+    1 -> 0.25
+    2 -> 0.5
+    3 -> 1
+    4 -> 1.5
+    _ -> 3
+padding : Direction -> Int -> Style
+padding dir sizeP = 
+  let  
+    cssFun = case dir of
+      Top   -> [ paddingTop ]
+      Right -> [ paddingRight ]
+      Bottom -> [ paddingBottom ]
+      Left -> [ paddingLeft ]
+      X -> [ paddingLeft, paddingRight ]
+      Y -> [ paddingTop, paddingBottom ]
+  in
+    Css.batch <| List.map (\t -> t (rem <| size sizeP)) cssFun
+
+margin : Direction -> Int -> Style
+margin dir sizeP = 
+  let  
+    cssFun = case dir of
+      Top   -> [ marginTop ]
+      Right -> [ marginRight ]
+      Bottom -> [ marginBottom ]
+      Left -> [ marginLeft ]
+      X -> [ marginLeft, marginRight ]
+      Y -> [ marginTop, marginBottom ]
+  in
+    Css.batch <| List.map (\t -> t (rem <| size sizeP)) cssFun
+
+
 
 type CssGridSize =
   --  Rem (Css.ExplicitLength a)
@@ -66,27 +89,36 @@ type CssGridSize =
   | Pct Pct
   | Fr
   | Auto
+
+toStyle : CssGridSize -> String
+toStyle sizeP =
+    case sizeP of
+      Rem rem -> (.value rem)
+      Pct pct -> (.value pct)
+      Fr -> "1fr"
+      Auto -> "auto"
+
 gridTemplateColumns : List (CssGridSize) -> Style
 gridTemplateColumns sizes =
-  let
-    toStyle : CssGridSize -> String
-    toStyle size =
-        case size of
-          Rem rem -> (.value rem)
-          Pct pct -> (.value pct)
-          Fr -> "1fr"
-          Auto -> "auto"
-  in
-    property "grid-template-columns" 
-      <| String.join " " 
-      <| List.map toStyle sizes
+  property "grid-template-columns" 
+    <| String.join " " 
+    <| List.map toStyle sizes
+
+gridTemplateRows : List (CssGridSize) -> Style
+gridTemplateRows sizes =
+  property "grid-template-rows" 
+    <| String.join " " 
+    <| List.map toStyle sizes
+
 
 
 type alias Model =
   { answer: String
   , userInput: String
+  , state : GameState
   }
 type Msg = Input String
+type GameState = Playing | GameOver | Won
 
 main : Program () Model Msg
 main =
@@ -98,11 +130,27 @@ main =
 
 update : Msg -> Model -> Model
 update action old =
-    case action of 
-      Input letter -> { old | userInput = old.userInput ++ letter }
+  let
+      isFinished = (1 + String.length old.userInput) == (String.length old.answer)
+      letter = case action of
+        Input a -> a
+      newState : GameState
+      newState =
+        if old.answer == (old.userInput ++ letter) 
+          then Won
+        else 
+          if isFinished 
+            then GameOver 
+            else Playing
+
+  in
+    { userInput = old.userInput ++ letter 
+    , answer = old.answer
+    , state = newState
+    }
 
 initialModel : Model
-initialModel = Model "Andy Warrens" ""
+initialModel = Model "Andy" "And" Playing
 
 view : Model -> Html Msg
 view model =
@@ -113,10 +161,42 @@ view model =
         ]
     , class "viewport"
     ]
-    [ logoBanner
-    , puzzleContent
-    , puzzleInput model
-    , hintSection
+    <|
+      ( case model.state of
+          Playing -> []
+          Won -> [ finishedOverlay IsWinner ]
+          GameOver -> [ finishedOverlay IsLoser ]
+      )
+      ++
+      [ logoBanner
+      , puzzleContent
+      , puzzleInput model
+      , hintSection
+      ]
+
+type GameFinished = IsWinner | IsLoser
+finishedOverlay : GameFinished -> Html a
+finishedOverlay state =
+  div 
+    [ css 
+      [ position absolute
+      , top (pct 10)
+      , left (pct 5)
+      , backgroundColor (rgba 255 255 255 0.9)
+      , border3 (px 1) (solid) (hex "000000")
+      , height (pct 80)
+      , width (pct 90)
+      , zIndex (int 5)
+      , displayFlex
+      , flexDirection column
+      , alignItems center
+      , justifyContent center
+      ]
+    ]
+    [ h1 [] [ text "Finished!" ]
+    , case state of 
+        IsWinner  -> span [] [ text "You are a winner!" ]
+        IsLoser  -> span [] [ text "You have lost :(" ]
     ]
 
 logoBanner : Html msg
@@ -129,9 +209,9 @@ logoBanner =
                               , Auto
                               , (Pct (pct 45)) ]
         , property "justify-items" "center"
-        , padding Py2
+        , padding Y 2
         , alignItems center
-        , height logoBannerHeight
+        , height appSize.logoBannerHeight
         ]
     ]
     [ yourDailyPlayerText
@@ -148,7 +228,7 @@ fbPlayerLogo =
         [ src "/fbplayer2.png" 
         , css 
             [ width auto 
-            , height logoBannerHeight
+            , height appSize.logoBannerHeight
             ]
         ] [] ]
 
@@ -177,7 +257,7 @@ yourDailyPlayerText =
         ]
       ]
       [ div [ css [ color theme.secondary.l3, textAlign center ]] [ text "Your Daily"]
-      , div [ css [ color theme.white, backgroundColor theme.primary.l4, textAlign center, padding Px4 ]] [ text "Player"]
+      , div [ css [ color theme.white, backgroundColor theme.primary.l4, textAlign center, padding X 4 ]] [ text "Player"]
       ]
 
   
@@ -196,7 +276,7 @@ puzzleContent =
                               , (Pct (pct 50))
                               , Fr
                               , Fr ]
-        , padding Px2
+        , padding X 2
         , overflowY auto
         ]
     ] 
@@ -220,6 +300,8 @@ puzzleInput model =
           , justifyContent center
           , color theme.white
           , backgroundColor theme.primary.l5
+          , padding Y 2
+          , margin Top 2
           ]
       ]
       [ div []
@@ -252,28 +334,45 @@ hintSection = div
       , alignItems center
       , justifyContent spaceAround
       , padding2 (rem 0.5) (rem 1.5)
-      , height (pct 15)
+      , height appSize.hintBannerHeight
       ]
   ]
-  <| List.map toHtmlCircle ["Hint1", "Hint2", "GiveUp"]
-
-toHtmlCircle : String -> Html msg
-toHtmlCircle value = 
-  div 
-    [ css
-        [ borderRadius (pct 50)
-        , textTransform uppercase 
-        , displayFlex
-        , alignItems center
-        , justifyContent center
-        , maxWidth (px 60)
-        , maxHeight (px 60)
-        , height (pct 100)
-        , flexGrow (Css.int 1)
-        , backgroundColor theme.secondary.l3
-        ]
+  <| List.indexedMap toHtmlCircle 
+    [ HintButton
+    , HintButton
+    , GiveUpButton
     ]
-    [ text value ]
+
+type HintSectionButton = HintButton | GiveUpButton
+
+toHtmlCircle : Int -> HintSectionButton -> Html msg
+toHtmlCircle ix buttonP = 
+  let
+    (isGiveUpBtn, value) = case buttonP of
+      HintButton -> (False, "Hint")
+      GiveUpButton -> (True, "Give Up")
+    textEl = 
+      span [] [ text value ]
+      :: if isGiveUpBtn then [] else [ span [] [ text <| String.fromInt ix ] ]
+  in
+    button 
+      [ css
+          [ borderRadius (pct 50)
+          , textTransform uppercase 
+          , width <| px (appSize.hintBannerHeight.numericValue)
+          , height <| px (appSize.hintBannerHeight.numericValue)
+          , textAlign center
+          , property "display" "grid"
+          , property "align-content" "center"
+          , property "justify-items" "center"
+          , fontWeight bold
+          , backgroundColor theme.primary.l5
+          , color (if isGiveUpBtn then theme.secondary.l3 else theme.white)
+          , borderWidth (px 0)
+          , cursor pointer
+          ]
+      ]
+      textEl
 
 infoToText : Info -> List (Html msg)
 infoToText info = 
