@@ -82,22 +82,11 @@ gridTemplateColumns sizes =
       <| List.map toStyle sizes
 
 
-
-{-| A reusable button which has some styles pre-applied to it.
--}
-btn : List (Attribute msg) -> List (Html msg) -> Html msg
-btn =
-    styled button
-        [ margin (px 12)
-        , color (rgb 250 250 250)
-        , hover
-            [ backgroundColor theme.primary.l1
-            , textDecoration underline
-            ]
-        ]
-
-type alias Model = Int
-type Msg = Decrement | Increment
+type alias Model =
+  { answer: String
+  , userInput: String
+  }
+type Msg = Input String
 
 main : Program () Model Msg
 main =
@@ -108,11 +97,12 @@ main =
         }
 
 update : Msg -> Model -> Model
-update arg1 arg2 =
-    Debug.todo "TODO"
+update action old =
+    case action of 
+      Input letter -> { old | userInput = old.userInput ++ letter }
 
 initialModel : Model
-initialModel = 0
+initialModel = Model "Andy Warrens" ""
 
 view : Model -> Html Msg
 view model =
@@ -125,11 +115,8 @@ view model =
     ]
     [ logoBanner
     , puzzleContent
-    , puzzleInput
+    , puzzleInput model
     , hintSection
---    , button [ onClick Decrement ] [ text "--" ]
---    , div [] [ text (String.fromInt model) ]
---    , button [ onClick Increment ] [ text "++" ]
     ]
 
 logoBanner : Html msg
@@ -145,9 +132,6 @@ logoBanner =
         , padding Py2
         , alignItems center
         , height logoBannerHeight
-        , hover
-            [ backgroundColor theme.primary.l1
-            ]
         ]
     ]
     [ yourDailyPlayerText
@@ -213,27 +197,53 @@ puzzleContent =
                               , Fr
                               , Fr ]
         , padding Px2
+        , overflowY auto
         ]
     ] 
     <| List.concatMap infoToText puzzleInfo
 
-puzzleInput : Html msg
-puzzleInput = div 
-  [ css
-      [ displayFlex
-      , flexDirection column
-      , alignItems center
-      , justifyContent center
-      , height (pct 20)
-      , color theme.white
-      , backgroundColor theme.primary.l5
+puzzleInput : Model -> Html Msg
+puzzleInput model = 
+  let
+    guesses = String.length model.userInput
+    fullHiddenAnswer = List.range 0 (String.length model.answer)
+      |> List.map (\_ -> "") 
+      |> String.join "."
+    hiddenAnswerPart = List.drop guesses (String.toList fullHiddenAnswer)
+    userAnswer = model.userInput ++ String.fromList hiddenAnswerPart
+  in
+    div 
+      [ css
+          [ displayFlex
+          , flexDirection column
+          , alignItems center
+          , justifyContent center
+          , color theme.white
+          , backgroundColor theme.primary.l5
+          ]
       ]
-  ]
-  [ div []
-      [ text "input player name" ]
-  , div []
-      [ text "........." ]
-  ]
+      [ div []
+          [ text "Who's your daily football player?" ]
+      , div [] [ text userAnswer ]
+      , keyboardInput "qwertyuiop"
+      , keyboardInput "asdfghjkl"
+      , keyboardInput "zxcvbnm"
+      , keyboardInputSpace
+      ]
+
+
+keyboardInput : String -> Html Msg
+keyboardInput letters =
+  div []
+    <| String.foldr 
+        (\letter xs -> button [ onClick (Input (String.fromChar letter)) ] [ text <| String.fromChar letter ] :: xs )
+        []
+        letters
+
+keyboardInputSpace : Html Msg
+keyboardInputSpace =
+  button [ onClick (Input " ")] [ text "space" ]
+
 
 hintSection : Html msg
 hintSection = div 
