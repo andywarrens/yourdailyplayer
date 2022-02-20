@@ -60,6 +60,29 @@ padding a =
       Py4 -> [ paddingTop (rem 1.5 ), paddingBottom (rem 1.5 ) ]
       Py5 -> [ paddingTop (rem 3   ), paddingBottom (rem 3   ) ]
 
+type CssGridSize =
+  --  Rem (Css.ExplicitLength a)
+    Rem Rem
+  | Pct Pct
+  | Fr
+  | Auto
+gridTemplateColumns : List (CssGridSize) -> Style
+gridTemplateColumns sizes =
+  let
+    toStyle : CssGridSize -> String
+    toStyle size =
+        case size of
+          Rem rem -> (.value rem)
+          Pct pct -> (.value pct)
+          Fr -> "1fr"
+          Auto -> "auto"
+  in
+    property "grid-template-columns" 
+      <| String.join " " 
+      <| List.map toStyle sizes
+
+
+
 {-| A reusable button which has some styles pre-applied to it.
 -}
 btn : List (Attribute msg) -> List (Html msg) -> Html msg
@@ -115,7 +138,9 @@ logoBanner =
     [ 
       css 
         [ property "display" "grid"
-        , property "grid-template-columns" "45% auto 45%"
+        , gridTemplateColumns [ (Pct (pct 45))
+                              , Auto
+                              , (Pct (pct 45)) ]
         , property "justify-items" "center"
         , padding Py2
         , alignItems center
@@ -178,9 +203,19 @@ puzzleContent =
   div 
     [ css 
         [ flexGrow (Css.int 1)
+        , backgroundImage (url "/fbsilhouette.png")
+        , backgroundPosition center
+        , backgroundSize2 auto (pct 100)
+        , backgroundRepeat noRepeat
+        , property "display" "grid"
+        , gridTemplateColumns [ (Pct (pct 35))
+                              , (Pct (pct 50))
+                              , Fr
+                              , Fr ]
+        , padding Px2
         ]
     ] 
-  <| List.map infoToText puzzleInfo
+    <| List.concatMap infoToText puzzleInfo
 
 puzzleInput : Html msg
 puzzleInput = div 
@@ -230,10 +265,10 @@ toHtmlCircle value =
     ]
     [ text value ]
 
-infoToText : Info -> Html msg
-infoToText info = div []
+infoToText : Info -> List (Html msg)
+infoToText info = 
   [ span [] [ text info.year ]
-  , span [] [ text info.team ]
+  , strong [] [ text info.team ]
   , span [] [ text info.number ]
   , span [] [ text info.goals ]
   ]
