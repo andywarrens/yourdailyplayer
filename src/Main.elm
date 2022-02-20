@@ -117,7 +117,8 @@ type alias Model =
   , userInput: String
   , state : GameState
   }
-type Msg = Input String
+type InputType = Key String | Backspace
+type Msg = Input InputType
 type GameState = Playing | GameOver | Won
 
 main : Program () Model Msg
@@ -131,12 +132,13 @@ main =
 update : Msg -> Model -> Model
 update action old =
   let
-      isFinished = (1 + String.length old.userInput) == (String.length old.answer)
-      letter = case action of
-        Input a -> a
+      userInput = case action of
+        Input (Key a) -> old.userInput ++ a 
+        Input Backspace -> String.dropRight 1 old.userInput
+      isFinished = (String.length userInput) == (String.length old.answer)
       newState : GameState
       newState =
-        if old.answer == (old.userInput ++ letter) 
+        if old.answer == userInput 
           then Won
         else 
           if isFinished 
@@ -144,7 +146,7 @@ update action old =
             else Playing
 
   in
-    { userInput = old.userInput ++ letter 
+    { userInput = userInput
     , answer = old.answer
     , state = newState
     }
@@ -310,7 +312,7 @@ puzzleInput model =
       , keyboardInput "qwertyuiop"
       , keyboardInput "asdfghjkl"
       , keyboardInput "zxcvbnm"
-      , keyboardInputSpace
+      , keyboardInputOthers
       ]
 
 
@@ -318,13 +320,21 @@ keyboardInput : String -> Html Msg
 keyboardInput letters =
   div []
     <| String.foldr 
-        (\letter xs -> button [ onClick (Input (String.fromChar letter)) ] [ text <| String.fromChar letter ] :: xs )
+        (\letter xs -> button [ onClick (Input (Key (String.fromChar letter))) ] [ text <| String.fromChar letter ] :: xs )
         []
         letters
 
-keyboardInputSpace : Html Msg
-keyboardInputSpace =
-  button [ onClick (Input " ")] [ text "space" ]
+keyboardInputOthers : Html Msg
+keyboardInputOthers = div 
+  [ css
+      [ displayFlex
+      , alignItems center
+      , justifyContent spaceAround
+      ]
+  ]
+  [ button [ onClick (Input (Key " "))] [ text "space" ]
+  , button [ onClick (Input (Backspace))] [ text "🔙" ]
+  ]
 
 
 hintSection : Html msg
