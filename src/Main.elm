@@ -38,15 +38,20 @@ theme =
     , white = (hex "ffffff")
     }
 
-appSize : { logoBannerHeight : Px, hintBannerHeight : Px }
+appSize : 
+  { logoBannerHeight : Px
+  , hintBannerHeight : Px 
+  , scoreCircleDiam  : Px 
+  }
 appSize = 
   { logoBannerHeight = (px 65)
   , hintBannerHeight = (px 55)
+  , scoreCircleDiam  = (px (55 * 1.25))
   }
 
 type Direction = 
     Top | Right | Bottom | Left 
-  | X | Y
+  | X | Y | XY Int
 size : Int -> Float
 size sizeP = case sizeP of
     0 -> 0
@@ -63,10 +68,14 @@ padding dir sizeP =
       Right -> [ paddingRight ]
       Bottom -> [ paddingBottom ]
       Left -> [ paddingLeft ]
-      X -> [ paddingLeft, paddingRight ]
-      Y -> [ paddingTop, paddingBottom ]
+      X   -> [ paddingLeft, paddingRight ]
+      Y   -> [ paddingTop, paddingBottom ]
+      XY _ -> []
   in
-    Css.batch <| List.map (\t -> t (rem <| size sizeP)) cssFun
+    Css.batch <| 
+      case dir of 
+        XY xSize -> [ padding2 (rem <| toFloat xSize) (rem <| toFloat sizeP) ]
+        _  -> List.map (\t -> t (rem <| size sizeP)) cssFun
 
 margin : Direction -> Int -> Style
 margin dir sizeP = 
@@ -78,8 +87,12 @@ margin dir sizeP =
       Left -> [ marginLeft ]
       X -> [ marginLeft, marginRight ]
       Y -> [ marginTop, marginBottom ]
+      XY _ -> []
   in
-    Css.batch <| List.map (\t -> t (rem <| size sizeP)) cssFun
+    Css.batch <| 
+      case dir of 
+        XY xSize -> [ margin2 (rem <| size xSize) (rem <| size sizeP) ]
+        _  -> List.map (\t -> t (rem <| size sizeP)) cssFun
 
 
 
@@ -110,16 +123,38 @@ gridTemplateRows sizes =
     <| String.join " " 
     <| List.map toStyle sizes
 
+circleIconCss : ExplicitLength unit -> Style
+circleIconCss circleDiam =
+  Css.batch
+    [ borderRadius (pct 50)
+    , width <| circleDiam
+    , height <| circleDiam
+    , textTransform uppercase 
+    , textAlign center
+    , property "display" "grid"
+    , property "align-content" "center"
+    , property "justify-items" "center"
+    ]
+
+
 
 
 type alias Model =
-  { answer: String
-  , userInput: String
-  , state : GameState
+  { userInput: String
+  , state   : GameState
+  , score   : Int
+  , guesses : List String
   }
 type InputType = Key String | Backspace
 type Msg = Input InputType
 type GameState = Playing | GameOver | Won
+
+gameModel : { answer : String, nGuesses : number, initialScore : Int }
+gameModel = 
+  { answer   = "Andy"
+  , nGuesses = 5
+  , initialScore = 10
+  }
 
 main : Program () Model Msg
 main =
@@ -135,24 +170,29 @@ update action old =
       userInput = case action of
         Input (Key a) -> old.userInput ++ a 
         Input Backspace -> String.dropRight 1 old.userInput
-      isFinished = (String.length userInput) == (String.length old.answer)
+      isFinished = (String.length userInput) == (String.length gameModel.answer)
+      hasWon = String.toLower gameModel.answer == String.toLower userInput 
+      newScore = if isFinished && not hasWon then old.score - 1 else old.score
       newState : GameState
       newState =
-        if old.answer == userInput 
+        if hasWon
           then Won
         else 
-          if isFinished 
+          if (isFinished && newScore == 0)
             then GameOver 
             else Playing
-
+      newGuesses = if isFinished && newState == Playing 
+        then userInput :: old.guesses
+        else old.guesses
   in
-    { userInput = userInput
-    , answer = old.answer
+    { userInput = if newState == Playing && isFinished then "" else userInput
     , state = newState
+    , score = newScore
+    , guesses = newGuesses
     }
 
 initialModel : Model
-initialModel = Model "Andy" "And" Playing
+initialModel = Model "An" Playing gameModel.initialScore []
 
 view : Model -> Html Msg
 view model =
@@ -238,12 +278,7 @@ helpButton : Html msg
 helpButton =
     div 
       [ css
-        [ borderRadius (pct 50)
-        , displayFlex
-        , alignItems center
-        , justifyContent center
-        , width (px 30)
-        , height (px 30)
+        [ circleIconCss (px 30)
         , backgroundColor theme.primary.l4
         , color theme.white
         ]
@@ -279,6 +314,7 @@ puzzleContent =
                               , Fr
                               , Fr ]
         , padding X 2
+        , padding Bottom 5
         , overflowY auto
         ]
     ] 
@@ -288,7 +324,7 @@ puzzleInput : Model -> Html Msg
 puzzleInput model = 
   let
     guesses = String.length model.userInput
-    fullHiddenAnswer = List.range 0 (String.length model.answer)
+    fullHiddenAnswer = List.range 0 (String.length gameModel.answer)
       |> List.map (\_ -> "") 
       |> String.join "."
     hiddenAnswerPart = List.drop guesses (String.toList fullHiddenAnswer)
@@ -304,11 +340,12 @@ puzzleInput model =
           , backgroundColor theme.primary.l5
           , padding Y 2
           , margin Top 2
+          , position relative
           ]
       ]
-      [ div []
-          [ text "Who's your daily football player?" ]
-      , div [] [ text userAnswer ]
+      [ scoreCircle model
+      , h3 [ css [ margin (XY 2) 0 ] ] [ text "Who's your daily football player?" ]
+      , div [ css [ margin Bottom 2 ]] [ text userAnswer ]
       , keyboardInput "qwertyuiop"
       , keyboardInput "asdfghjkl"
       , keyboardInput "zxcvbnm"
@@ -335,6 +372,25 @@ keyboardInputOthers = div
   [ button [ onClick (Input (Key " "))] [ text "space" ]
   , button [ onClick (Input (Backspace))] [ text "🔙" ]
   ]
+
+scoreCircle : Model -> Html a
+scoreCircle { score } =
+  h3 
+    [ css
+      [ circleIconCss appSize.scoreCircleDiam
+      , backgroundColor theme.secondary.l3
+      , position absolute
+      , right (px 0)
+      , top   (px (-0.75 * appSize.scoreCircleDiam.numericValue))
+      , margin (XY 0) 0
+      , margin Right 3
+      , zIndex <| Css.int 1
+      , textTransform uppercase 
+      , fontSize (rem <| size 4)
+      ]
+    ]
+    [ text <| String.fromInt score ]
+
 
 
 hintSection : Html msg
@@ -367,14 +423,8 @@ toHtmlCircle ix buttonP =
   in
     button 
       [ css
-          [ borderRadius (pct 50)
-          , textTransform uppercase 
-          , width <| px (appSize.hintBannerHeight.numericValue)
-          , height <| px (appSize.hintBannerHeight.numericValue)
-          , textAlign center
-          , property "display" "grid"
-          , property "align-content" "center"
-          , property "justify-items" "center"
+          [ circleIconCss 
+              (px (appSize.hintBannerHeight.numericValue))
           , fontWeight bold
           , backgroundColor theme.primary.l5
           , color (if isGiveUpBtn then theme.secondary.l3 else theme.white)
