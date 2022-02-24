@@ -1,5 +1,9 @@
+body, h1, h2, h3, h4, h5 { margin: 0; padding: 0; }
+
+button { box-sizing: border-box; }
+
 .viewport {
-    position: relative;
+    margin: 1rem 0 0 1rem;
     width: 320px;
     height: 500px;
     border: 1px solid black;

@@ -1,10 +1,11 @@
 module Main exposing (main)
 
-import Css exposing (..)
 import Html
 import Html.Styled exposing (..)
 import Html.Styled.Attributes exposing (css, href, src, class)
 import Html.Styled.Events exposing (onClick)
+import Css exposing (..)
+import Css.Transitions as T
 import Browser
 
 type alias ThemeColor =
@@ -20,7 +21,6 @@ type alias ThemeColor =
 theme : 
   { secondary : ThemeColor
   , primary   : ThemeColor
-  , white     : Color
   }
 theme =
     { primary = ThemeColor
@@ -35,8 +35,12 @@ theme =
         (hsl 29 0.90 0.45)
         (hsl 29 0.90 0.30)
         (hsl 29 0.90 0.15)
-    , white = (hex "ffffff")
     }
+  
+white : Color
+white = (hex "ffffff")
+black : Color
+black = (hex "000000")
 
 appSize : 
   { logoBannerHeight : Px
@@ -44,7 +48,7 @@ appSize :
   , scoreCircleDiam  : Px 
   }
 appSize = 
-  { logoBannerHeight = (px 65)
+  { logoBannerHeight = (px 80)
   , hintBannerHeight = (px 55)
   , scoreCircleDiam  = (px (55 * 1.25))
   }
@@ -94,8 +98,6 @@ margin dir sizeP =
         XY xSize -> [ margin2 (rem <| size xSize) (rem <| size sizeP) ]
         _  -> List.map (\t -> t (rem <| size sizeP)) cssFun
 
-
-
 type CssGridSize =
   --  Rem (Css.ExplicitLength a)
     Rem Rem
@@ -123,6 +125,14 @@ gridTemplateRows sizes =
     <| String.join " " 
     <| List.map toStyle sizes
 
+
+uncontained : Style
+uncontained =
+    Css.batch 
+      [ border (px 0)
+      , backgroundColor white
+      ]
+
 circleIconCss : ExplicitLength unit -> Style
 circleIconCss circleDiam =
   Css.batch
@@ -144,9 +154,13 @@ type alias Model =
   , state   : GameState
   , score   : Int
   , guesses : List String
+  , hint1   : HintModel
   }
+type alias HintModel = { active: Bool }
 type InputType = Key String | Backspace
-type Msg = Input InputType
+type Msg = 
+    Input InputType 
+  | OpenHint | CloseHint
 type GameState = Playing | GameOver | Won
 
 gameModel : { answer : String, nGuesses : number, initialScore : Int }
@@ -166,33 +180,48 @@ main =
 
 update : Msg -> Model -> Model
 update action old =
-  let
-      userInput = case action of
-        Input (Key a) -> old.userInput ++ a 
-        Input Backspace -> String.dropRight 1 old.userInput
-      isFinished = (String.length userInput) == (String.length gameModel.answer)
-      hasWon = String.toLower gameModel.answer == String.toLower userInput 
-      newScore = if isFinished && not hasWon then old.score - 1 else old.score
-      newState : GameState
-      newState =
-        if hasWon
-          then Won
-        else 
-          if (isFinished && newScore == 0)
-            then GameOver 
-            else Playing
-      newGuesses = if isFinished && newState == Playing 
-        then userInput :: old.guesses
-        else old.guesses
+  let 
+    updateHint oldHint value = { oldHint | active = value }
   in
-    { userInput = if newState == Playing && isFinished then "" else userInput
-    , state = newState
-    , score = newScore
-    , guesses = newGuesses
-    }
+    case action of 
+      OpenHint -> { old | hint1 = updateHint old.hint1 True }
+      CloseHint -> { old | hint1 = updateHint old.hint1 False }
+
+      _ -> 
+        let
+          userInput = case action of
+            Input (Key a) -> old.userInput ++ a 
+            Input Backspace -> String.dropRight 1 old.userInput
+            _ -> old.userInput
+          isFinished = (String.length userInput) == (String.length gameModel.answer)
+          hasWon = String.toLower gameModel.answer == String.toLower userInput 
+          newScore = if isFinished && not hasWon then old.score - 1 else old.score
+          newState : GameState
+          newState =
+            if hasWon
+              then Won
+            else 
+              if (isFinished && newScore == 0)
+                then GameOver 
+                else Playing
+          newGuesses = if isFinished && newState == Playing 
+            then userInput :: old.guesses
+            else old.guesses
+        in
+          { userInput = if newState == Playing && isFinished then "" else userInput
+          , state = newState
+          , score = newScore
+          , guesses = newGuesses
+          , hint1 = old.hint1
+          }
 
 initialModel : Model
-initialModel = Model "An" Playing gameModel.initialScore []
+initialModel = Model 
+  "An" 
+  Playing 
+  gameModel.initialScore 
+  [] 
+  { active = False }
 
 view : Model -> Html Msg
 view model =
@@ -214,6 +243,7 @@ view model =
       , puzzleContent
       , puzzleInput model
       , hintSection
+      , hintScreen model.hint1
       ]
 
 type GameFinished = IsWinner | IsLoser
@@ -247,13 +277,14 @@ logoBanner =
     [ 
       css 
         [ property "display" "grid"
-        , gridTemplateColumns [ (Pct (pct 45))
+        , gridTemplateColumns [ (Pct (pct 40))
                               , Auto
-                              , (Pct (pct 45)) ]
+                              , (Pct (pct 40)) ]
         , property "justify-items" "center"
         , padding Y 2
         , alignItems center
         , height appSize.logoBannerHeight
+        , boxSizing borderBox
         ]
     ]
     [ yourDailyPlayerText
@@ -265,14 +296,14 @@ logoBanner =
 fbPlayerLogo : Html msg
 fbPlayerLogo =
     div 
-      []
+      [ css [ padding Right 1 ] 
+      ]
       [ img 
         [ src "/fbplayer2.png" 
-        , css 
-            [ width auto 
-            , height appSize.logoBannerHeight
-            ]
-        ] [] ]
+        , css [ width (pct 100) ]
+        ] 
+        []
+      ]
 
 helpButton : Html msg
 helpButton =
@@ -280,7 +311,7 @@ helpButton =
       [ css
         [ circleIconCss (px 30)
         , backgroundColor theme.primary.l4
-        , color theme.white
+        , color white
         ]
       ]
       [ text "?" ]
@@ -294,7 +325,7 @@ yourDailyPlayerText =
         ]
       ]
       [ div [ css [ color theme.secondary.l3, textAlign center ]] [ text "Your Daily"]
-      , div [ css [ color theme.white, backgroundColor theme.primary.l4, textAlign center, padding X 4 ]] [ text "Player"]
+      , div [ css [ color white, backgroundColor theme.primary.l4, textAlign center, padding X 4 ]] [ text "Player"]
       ]
 
   
@@ -336,7 +367,7 @@ puzzleInput model =
           , flexDirection column
           , alignItems center
           , justifyContent center
-          , color theme.white
+          , color white
           , backgroundColor theme.primary.l5
           , padding Y 2
           , margin Top 2
@@ -393,7 +424,7 @@ scoreCircle { score } =
 
 
 
-hintSection : Html msg
+hintSection : Html Msg
 hintSection = div 
   [ css
       [ displayFlex
@@ -411,7 +442,7 @@ hintSection = div
 
 type HintSectionButton = HintButton | GiveUpButton
 
-toHtmlCircle : Int -> HintSectionButton -> Html msg
+toHtmlCircle : Int -> HintSectionButton -> Html Msg
 toHtmlCircle ix buttonP = 
   let
     (isGiveUpBtn, value) = case buttonP of
@@ -427,12 +458,72 @@ toHtmlCircle ix buttonP =
               (px (appSize.hintBannerHeight.numericValue))
           , fontWeight bold
           , backgroundColor theme.primary.l5
-          , color (if isGiveUpBtn then theme.secondary.l3 else theme.white)
+          , color (if isGiveUpBtn then theme.secondary.l3 else white)
           , borderWidth (px 0)
           , cursor pointer
           ]
+      , onClick OpenHint
       ]
       textEl
+
+hintScreen : HintModel -> Html Msg
+hintScreen { active } =
+  let 
+    uncontainedBtn = styled button 
+      [ uncontained
+      , fontSize (rem <| size 4)
+      , height (px 40)
+      , hover
+          [ border3 (px 1) solid black ]
+      ]
+  in
+    div 
+      [ css
+        [ position absolute
+        , width (px 320)
+        , height (px 500)
+        , border3 (px 1) solid black
+        , marginTop (rem 1)
+        , backgroundColor white
+        , transform <| translate (px <| if active then 0 else 320)
+        , zIndex (Css.int 2)
+        , top (px 0)
+        , paddingTop appSize.logoBannerHeight
+        , padding X 2
+        , boxSizing borderBox
+        , property "display" "grid"
+        , gridTemplateColumns [ Fr, Fr ]
+        , gridTemplateRows [ Auto, Auto, Fr ]
+        , property "justify-items" "center"
+        , property "align-items" "start"
+        , textAlign center
+        , T.transition
+            [ T.transform3 200 0 T.linear
+            ]
+        ]
+      ]
+      [ h2 
+        [ css 
+            [ fontSize (rem <| size 4 )  
+            , color white
+            , backgroundColor theme.primary.l5
+            , property "grid-column" "1 / 3"
+            , margin Bottom 4
+            ]
+        ]
+        [ text "Wanna know the total characters in your player’s name?" ]
+      , uncontainedBtn 
+          [ css [ color theme.secondary.l3 ]
+          , onClick CloseHint
+          ]
+          [ text "YES" ]
+      , uncontainedBtn 
+          [ css [ color theme.primary.l5 ] 
+          , onClick CloseHint
+          ]
+          [ text "NO" ]
+      , caption [ css [ color theme.secondary.l3 ]] [ text "-2 points" ]
+      ]
 
 infoToText : Info -> List (Html msg)
 infoToText info = 
