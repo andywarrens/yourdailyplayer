@@ -54,7 +54,7 @@ gridTemplateRows sizes =
     <| List.map toStyle sizes
 
 
-type PopupType = Info | Question
+type PopupType = Informative | Question | Finished
 popup : Bool -> PopupType -> List (Html Msg) -> Html Msg
 popup isVisible popupType content = 
   let
@@ -86,8 +86,8 @@ popup isVisible popupType content =
              ]
              [ text "X" ]
     offscreenX = case popupType of
-      Info -> -100
-      Question -> 100
+      Informative -> -100
+      _ -> 100
   in
     div 
       [ css
@@ -101,8 +101,8 @@ popup isVisible popupType content =
         , boxSizing borderBox
         , textAlign center
         , case popupType of 
-            Info -> backgroundColor theme.primary.l5
-            Question -> backgroundColor (hsla 0 0 1 0.9)
+            Informative -> backgroundColor theme.primary.l5
+            _ -> backgroundColor (hsla 0 0 1 0.9)
         , T.transition
             [ T.transform3 200 0 T.linear
             ]
@@ -110,8 +110,8 @@ popup isVisible popupType content =
         , class "full-page"
       ]
       ( case popupType of
-          Info -> closeButton :: content
-          Question -> content
+          Informative -> closeButton :: content
+          _ -> content
       )
 
 padd : Direction -> Int -> Style

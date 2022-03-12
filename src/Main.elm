@@ -13,6 +13,7 @@ import Views.Helpers as H
 import Model exposing (..)
 import Views.Helpers exposing (padd, size, Direction(..))
 import Views.Helpers exposing (uncontained, circleIconCss, marg)
+import Views.Helpers exposing (popup, PopupType(..))
 
 
 type alias Model =
@@ -20,17 +21,25 @@ type alias Model =
   , state   : GameState
   , score   : Int
   , guesses : List String
-  , hint1   : HintModel
-  , showHint : Bool
+  , hint1   : Maybe Hint
+  , showHelp : Bool
+  , showHint : Maybe Hint
   }
-type alias HintModel = { active: Bool }
 type GameState = Playing | GameOver | Won
 
-gameModel : { answer : String, nGuesses : number, initialScore : Int }
+gameModel : 
+  { answer : String
+  , nGuesses : number
+  , initialScore : Int 
+  , hint1 : Hint
+  , hint2 : Hint
+  }
 gameModel = 
   { answer   = "Andy"
   , nGuesses = 5
   , initialScore = 10
+  , hint1 = CharCount 4
+  , hint2 = Nationality "Belg"
   }
 
 main : Program () Model Msg
@@ -43,40 +52,40 @@ main =
 
 update : Msg -> Model -> Model
 update action old =
-  let 
-    updateHint oldHint value = { oldHint | active = value }
-  in
-    case action of 
-      OpenHint -> { old | hint1 = updateHint old.hint1 True }
-      CloseHint -> { old | hint1 = updateHint old.hint1 False }
-      ToggleHelp isVisible -> { old | showHint = isVisible }
-      _ -> 
-        let
-          userInput = case action of
-            Input (Key a) -> old.userInput ++ a 
-            Input Backspace -> String.dropRight 1 old.userInput
-            _ -> old.userInput
-          isFinished = (String.length userInput) == (String.length gameModel.answer)
-          hasWon = String.toLower gameModel.answer == String.toLower userInput 
-          newScore = if isFinished && not hasWon then old.score - 1 else old.score
-          newState : GameState
-          newState =
-            if hasWon
-              then Won
-            else 
-              if (isFinished && newScore == 0)
-                then GameOver 
-                else Playing
-          newGuesses = if isFinished && newState == Playing 
-            then userInput :: old.guesses
-            else old.guesses
-        in
-          { old |
-            userInput = if newState == Playing && isFinished then "" else userInput
-          , state = newState
-          , score = newScore
-          , guesses = newGuesses
-          }
+  case action of 
+    OpenHint x -> { old | showHint = Just x }
+    CloseHint -> { old | showHint = Nothing }
+    ToggleHelp isVisible -> { old | showHelp = isVisible }
+    GiveUp -> { old | state = GameOver }
+    Input key -> 
+      let
+        userInput = case key of
+          (Key a) -> old.userInput ++ a 
+          Backspace -> String.dropRight 1 old.userInput
+          Enter -> old.userInput
+        isFinished = case key of 
+          Enter -> True
+          _ -> False
+        hasWon = isFinished && String.toLower gameModel.answer == String.toLower userInput 
+        newScore = if isFinished && not hasWon then old.score - 1 else old.score
+        newState : GameState
+        newState =
+          if hasWon
+            then Won
+          else 
+            if (isFinished && newScore == 0)
+              then GameOver 
+              else Playing
+        newGuesses = if isFinished && newState == Playing 
+          then userInput :: old.guesses
+          else old.guesses
+      in
+        { old |
+          userInput = if newState == Playing && isFinished then "" else userInput
+        , state = newState
+        , score = newScore
+        , guesses = newGuesses
+        }
 
 initialModel : Model
 initialModel = Model 
@@ -84,57 +93,41 @@ initialModel = Model
   Playing 
   gameModel.initialScore 
   [] 
-  { active = False }
+  Nothing
   False
+  Nothing
 
 view : Model -> Html Msg
 view model =
-  div 
-    [ css 
-        [ displayFlex
-        , flexDirection column
-        ]
-    , class "full-page"
-    ]
-    <|
-      ( case model.state of
-          Playing -> []
-          Won -> [ finishedOverlay IsWinner ]
-          GameOver -> [ finishedOverlay IsLoser ]
-      )
-      ++
+  let 
+    showGameover = case model.state of
+          Playing -> False
+          _ -> True
+  in
+    div 
+      [ css 
+          [ displayFlex
+          , flexDirection column
+          ]
+      , class "full-page"
+      ]
       [ logoBanner
       , puzzleContent
       , puzzleInput model
       , hintSection
       -- popups
-      , helpScreen model.showHint
-      , hintScreen model.hint1
+      , finishedOverlay showGameover model.state
+      , helpScreen model.showHelp
+      , hintScreen model.showHint
       ]
 
-type GameFinished = IsWinner | IsLoser
-finishedOverlay : GameFinished -> Html a
-finishedOverlay state =
-  div 
-    [ css 
-      [ position absolute
-      , top (pct 10)
-      , left (pct 5)
-      , backgroundColor (rgba 255 255 255 0.9)
-      , border3 (px 1) (solid) (hex "000000")
-      , height (pct 80)
-      , width (pct 90)
-      , zIndex (int 5)
-      , displayFlex
-      , flexDirection column
-      , alignItems center
-      , justifyContent center
-      ]
-    ]
+finishedOverlay : Bool -> GameState -> Html Msg
+finishedOverlay isVisible state =
+  popup isVisible Finished
     [ h1 [] [ text "Finished!" ]
     , case state of 
-        IsWinner  -> span [] [ text "You are a winner!" ]
-        IsLoser  -> span [] [ text "You have lost :(" ]
+        Won -> span [] [ text "You are a winner!" ]
+        _   -> span [] [ text "You have lost :(" ]
     ]
 
 logoBanner : Html Msg
@@ -253,11 +246,36 @@ puzzleInput model =
       [ scoreCircle model
       , h3 [ css [ marg (H.XY 2) 0 ] ] [ text "Who's your daily football player?" ]
       , div [ css [ marg H.Bottom 2 ]] [ text userAnswer ]
-      , keyboardInput "qwertyuiop"
+      , keyboard
+      ]
+  
+keyboard : Html Msg
+keyboard =
+  div 
+    [ css 
+       [ displayFlex
+       , property "gap" "0.25rem"
+       ]
+    ]
+  [ div 
+      [ css 
+        [ displayFlex
+        , flexDirection column
+        , alignItems center
+        , property "gap" "0.25rem"
+        ]
+      ]
+      [ keyboardInput "qwertyuiop"
       , keyboardInput "asdfghjkl"
       , keyboardInput "zxcvbnm"
       , keyboardInputOthers
       ]
+  , button 
+    [ css [ height (rem 3) ] 
+    , onClick (Input Enter)
+    ]
+    [ text "↩" ]
+  ]
 
 
 keyboardInput : String -> Html Msg
@@ -310,20 +328,20 @@ hintSection = div
       , height H.appSize.hintBannerHeight
       ]
   ]
-  <| List.indexedMap toHtmlCircle 
-    [ HintButton
-    , HintButton
+  <| List.map toHtmlCircle 
+    [ HintButton gameModel.hint1
+    , HintButton gameModel.hint2
     , GiveUpButton
     ]
 
-type HintSectionButton = HintButton | GiveUpButton
+type HintSectionButton = HintButton Hint | GiveUpButton
 
-toHtmlCircle : Int -> HintSectionButton -> Html Msg
-toHtmlCircle ix buttonP = 
+toHtmlCircle : HintSectionButton -> Html Msg
+toHtmlCircle buttonP = 
   let
-    (isGiveUpBtn, value) = case buttonP of
-      HintButton -> (False, "Hint")
-      GiveUpButton -> (True, "Give Up")
+    (isGiveUpBtn, value, action) = case buttonP of
+      HintButton hint -> (False, "Hint", OpenHint hint)
+      GiveUpButton -> (True, "Give Up", GiveUp)
     textEl = 
       span [] [ text value ]
   in
@@ -337,15 +355,15 @@ toHtmlCircle ix buttonP =
           , borderWidth (px 0)
           , cursor pointer
           ]
-      , onClick OpenHint
+      , onClick action
       ]
       [ textEl ]
 
 helpScreen : Bool -> Html Msg
 helpScreen isVisible =
-   H.popup 
+   popup 
     isVisible
-    H.Info
+    Informative
       [ h2 
         [ css 
             [ fontSize (rem <| size 4 )  
@@ -369,8 +387,8 @@ helpScreen isVisible =
       ]
    
 
-hintScreen : HintModel -> Html Msg
-hintScreen { active } =
+hintScreen : Maybe Hint -> Html Msg
+hintScreen hint =
   let 
     uncontainedBtn = styled button 
       [ uncontained
@@ -379,8 +397,12 @@ hintScreen { active } =
       , hover
           [ border3 (px 1) solid black ]
       ]
+    (active, question) = case hint of
+      Just (CharCount _) -> (True, "Wanna know the total characters in your player’s name?")
+      Just (Nationality _) -> (True, "Wanna know your player’s nationality?")
+      Nothing -> (False, "")
   in
-    H.popup active H.Question
+    popup active Question
       [ h2 
         [ css 
             [ fontSize (rem <| size 4 )  
@@ -390,7 +412,7 @@ hintScreen { active } =
             , marg H.Bottom 4
             ]
         ]
-        [ text "Wanna know the total characters in your player’s name?" ]
+        [ text question]
       , uncontainedBtn 
           [ css [ color theme.secondary.l3 ]
           , onClick CloseHint

@@ -2,10 +2,12 @@ module Model exposing (..)
 
 import Css exposing (Color, hsl, hex)
 
-type InputType = Key String | Backspace
+type InputType = Key String | Backspace | Enter
+type Hint = CharCount Int | Nationality String
 type Msg = 
     Input InputType 
-  | OpenHint | CloseHint
+  | OpenHint Hint | CloseHint
+  | GiveUp
   | ToggleHelp Bool
 
 type alias ThemeColor =
