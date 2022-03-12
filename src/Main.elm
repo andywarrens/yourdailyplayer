@@ -1,152 +1,18 @@
 module Main exposing (main)
 
-import Html
-import Html.Styled exposing (..)
-import Html.Styled.Attributes exposing (css, href, src, class)
+import Html.Styled exposing (
+  div, h1, h2, h3, button, img, span, strong, caption)
+import Html.Styled exposing (
+  Html, styled, toUnstyled, text)
+import Html.Styled.Attributes exposing (css, src, class)
 import Html.Styled.Events exposing (onClick)
 import Css exposing (..)
-import Css.Transitions as T
 import Browser
 
-type alias ThemeColor =
-  { l1: Color
-  , l2: Color
-  , l3: Color
-  , l4: Color
-  , l5: Color
-  }
-
-{-| A plain old record holding a couple of theme colors.
--}
-theme : 
-  { secondary : ThemeColor
-  , primary   : ThemeColor
-  }
-theme =
-    { primary = ThemeColor
-        (hsl 223 0.90 0.85)
-        (hsl 223 0.90 0.65)
-        (hsl 223 0.90 0.45)
-        (hsl 223 0.90 0.30)
-        (hsl 223 0.90 0.15)
-    , secondary = ThemeColor
-        (hsl 29 0.90 0.85)
-        (hsl 29 0.90 0.65)
-        (hsl 29 0.90 0.45)
-        (hsl 29 0.90 0.30)
-        (hsl 29 0.90 0.15)
-    }
-  
-white : Color
-white = (hex "ffffff")
-black : Color
-black = (hex "000000")
-
-appSize : 
-  { logoBannerHeight : Px
-  , hintBannerHeight : Px 
-  , scoreCircleDiam  : Px 
-  }
-appSize = 
-  { logoBannerHeight = (px 80)
-  , hintBannerHeight = (px 55)
-  , scoreCircleDiam  = (px (55 * 1.25))
-  }
-
-type Direction = 
-    Top | Right | Bottom | Left 
-  | X | Y | XY Int
-size : Int -> Float
-size sizeP = case sizeP of
-    0 -> 0
-    1 -> 0.25
-    2 -> 0.5
-    3 -> 1
-    4 -> 1.5
-    _ -> 3
-padding : Direction -> Int -> Style
-padding dir sizeP = 
-  let  
-    cssFun = case dir of
-      Top   -> [ paddingTop ]
-      Right -> [ paddingRight ]
-      Bottom -> [ paddingBottom ]
-      Left -> [ paddingLeft ]
-      X   -> [ paddingLeft, paddingRight ]
-      Y   -> [ paddingTop, paddingBottom ]
-      XY _ -> []
-  in
-    Css.batch <| 
-      case dir of 
-        XY xSize -> [ padding2 (rem <| toFloat xSize) (rem <| toFloat sizeP) ]
-        _  -> List.map (\t -> t (rem <| size sizeP)) cssFun
-
-margin : Direction -> Int -> Style
-margin dir sizeP = 
-  let  
-    cssFun = case dir of
-      Top   -> [ marginTop ]
-      Right -> [ marginRight ]
-      Bottom -> [ marginBottom ]
-      Left -> [ marginLeft ]
-      X -> [ marginLeft, marginRight ]
-      Y -> [ marginTop, marginBottom ]
-      XY _ -> []
-  in
-    Css.batch <| 
-      case dir of 
-        XY xSize -> [ margin2 (rem <| size xSize) (rem <| size sizeP) ]
-        _  -> List.map (\t -> t (rem <| size sizeP)) cssFun
-
-type CssGridSize =
-  --  Rem (Css.ExplicitLength a)
-    Rem Rem
-  | Pct Pct
-  | Fr
-  | Auto
-
-toStyle : CssGridSize -> String
-toStyle sizeP =
-    case sizeP of
-      Rem rem -> (.value rem)
-      Pct pct -> (.value pct)
-      Fr -> "1fr"
-      Auto -> "auto"
-
-gridTemplateColumns : List (CssGridSize) -> Style
-gridTemplateColumns sizes =
-  property "grid-template-columns" 
-    <| String.join " " 
-    <| List.map toStyle sizes
-
-gridTemplateRows : List (CssGridSize) -> Style
-gridTemplateRows sizes =
-  property "grid-template-rows" 
-    <| String.join " " 
-    <| List.map toStyle sizes
-
-
-uncontained : Style
-uncontained =
-    Css.batch 
-      [ border (px 0)
-      , backgroundColor white
-      ]
-
-circleIconCss : ExplicitLength unit -> Style
-circleIconCss circleDiam =
-  Css.batch
-    [ borderRadius (pct 50)
-    , width <| circleDiam
-    , height <| circleDiam
-    , textTransform uppercase 
-    , textAlign center
-    , property "display" "grid"
-    , property "align-content" "center"
-    , property "justify-items" "center"
-    ]
-
-
+import Views.Helpers as H
+import Model exposing (..)
+import Views.Helpers exposing (padd, size, Direction(..))
+import Views.Helpers exposing (uncontained, circleIconCss, marg)
 
 
 type alias Model =
@@ -155,12 +21,9 @@ type alias Model =
   , score   : Int
   , guesses : List String
   , hint1   : HintModel
+  , showHint : Bool
   }
 type alias HintModel = { active: Bool }
-type InputType = Key String | Backspace
-type Msg = 
-    Input InputType 
-  | OpenHint | CloseHint
 type GameState = Playing | GameOver | Won
 
 gameModel : { answer : String, nGuesses : number, initialScore : Int }
@@ -186,7 +49,7 @@ update action old =
     case action of 
       OpenHint -> { old | hint1 = updateHint old.hint1 True }
       CloseHint -> { old | hint1 = updateHint old.hint1 False }
-
+      ToggleHelp isVisible -> { old | showHint = isVisible }
       _ -> 
         let
           userInput = case action of
@@ -208,11 +71,11 @@ update action old =
             then userInput :: old.guesses
             else old.guesses
         in
-          { userInput = if newState == Playing && isFinished then "" else userInput
+          { old |
+            userInput = if newState == Playing && isFinished then "" else userInput
           , state = newState
           , score = newScore
           , guesses = newGuesses
-          , hint1 = old.hint1
           }
 
 initialModel : Model
@@ -222,6 +85,7 @@ initialModel = Model
   gameModel.initialScore 
   [] 
   { active = False }
+  False
 
 view : Model -> Html Msg
 view model =
@@ -230,7 +94,7 @@ view model =
         [ displayFlex
         , flexDirection column
         ]
-    , class "viewport"
+    , class "full-page"
     ]
     <|
       ( case model.state of
@@ -243,6 +107,8 @@ view model =
       , puzzleContent
       , puzzleInput model
       , hintSection
+      -- popups
+      , helpScreen model.showHint
       , hintScreen model.hint1
       ]
 
@@ -271,19 +137,19 @@ finishedOverlay state =
         IsLoser  -> span [] [ text "You have lost :(" ]
     ]
 
-logoBanner : Html msg
+logoBanner : Html Msg
 logoBanner = 
   div 
     [ 
       css 
         [ property "display" "grid"
-        , gridTemplateColumns [ (Pct (pct 40))
-                              , Auto
-                              , (Pct (pct 40)) ]
+        , H.gridTemplateColumns [ (H.Pct (pct 40))
+                              , H.Auto
+                              , (H.Pct (pct 40)) ]
         , property "justify-items" "center"
-        , padding Y 2
+        , padd H.Y 2
         , alignItems center
-        , height appSize.logoBannerHeight
+        , height H.appSize.logoBannerHeight
         , boxSizing borderBox
         ]
     ]
@@ -296,7 +162,7 @@ logoBanner =
 fbPlayerLogo : Html msg
 fbPlayerLogo =
     div 
-      [ css [ padding Right 1 ] 
+      [ css [ padd H.Right 1 ] 
       ]
       [ img 
         [ src "/fbplayer2.png" 
@@ -305,12 +171,14 @@ fbPlayerLogo =
         []
       ]
 
-helpButton : Html msg
+helpButton : Html Msg
 helpButton =
-    div 
-      [ css
-        [ circleIconCss (px 30)
-        , backgroundColor theme.primary.l4
+    button
+      [ onClick (ToggleHelp True)
+      , css
+        [ uncontained
+        , circleIconCss (px 30)
+        , backgroundColor theme.primary.l5
         , color white
         ]
       ]
@@ -324,8 +192,16 @@ yourDailyPlayerText =
         [ transform (rotate (deg -30))
         ]
       ]
-      [ div [ css [ color theme.secondary.l3, textAlign center ]] [ text "Your Daily"]
-      , div [ css [ color white, backgroundColor theme.primary.l4, textAlign center, padding X 4 ]] [ text "Player"]
+      [ div 
+          [ css [ color theme.secondary.l3, textAlign center ]] 
+          [ text "Your Daily"]
+      , div [ css 
+              [ color white
+              , backgroundColor theme.primary.l5
+              , textAlign center
+              , padd H.X 4 ]
+              ] 
+              [ text "Player"]
       ]
 
   
@@ -340,12 +216,12 @@ puzzleContent =
         , backgroundSize2 auto (pct 100)
         , backgroundRepeat noRepeat
         , property "display" "grid"
-        , gridTemplateColumns [ (Pct (pct 35))
-                              , (Pct (pct 50))
-                              , Fr
-                              , Fr ]
-        , padding X 2
-        , padding Bottom 5
+        , H.gridTemplateColumns [ (H.Pct (pct 35))
+                              , (H.Pct (pct 50))
+                              , H.Fr
+                              , H.Fr ]
+        , padd H.X 2
+        , padd H.Bottom 5
         , overflowY auto
         ]
     ] 
@@ -369,14 +245,14 @@ puzzleInput model =
           , justifyContent center
           , color white
           , backgroundColor theme.primary.l5
-          , padding Y 2
-          , margin Top 2
+          , padd H.Y 2
+          , marg H.Top 2
           , position relative
           ]
       ]
       [ scoreCircle model
-      , h3 [ css [ margin (XY 2) 0 ] ] [ text "Who's your daily football player?" ]
-      , div [ css [ margin Bottom 2 ]] [ text userAnswer ]
+      , h3 [ css [ marg (H.XY 2) 0 ] ] [ text "Who's your daily football player?" ]
+      , div [ css [ marg H.Bottom 2 ]] [ text userAnswer ]
       , keyboardInput "qwertyuiop"
       , keyboardInput "asdfghjkl"
       , keyboardInput "zxcvbnm"
@@ -408,13 +284,13 @@ scoreCircle : Model -> Html a
 scoreCircle { score } =
   h3 
     [ css
-      [ circleIconCss appSize.scoreCircleDiam
+      [ circleIconCss H.appSize.scoreCircleDiam
       , backgroundColor theme.secondary.l3
       , position absolute
       , right (px 0)
-      , top   (px (-0.75 * appSize.scoreCircleDiam.numericValue))
-      , margin (XY 0) 0
-      , margin Right 3
+      , top   (px (-0.75 * H.appSize.scoreCircleDiam.numericValue))
+      , marg (H.XY 0) 0
+      , marg H.Right 3
       , zIndex <| Css.int 1
       , textTransform uppercase 
       , fontSize (rem <| size 4)
@@ -431,7 +307,7 @@ hintSection = div
       , alignItems center
       , justifyContent spaceAround
       , padding2 (rem 0.5) (rem 1.5)
-      , height appSize.hintBannerHeight
+      , height H.appSize.hintBannerHeight
       ]
   ]
   <| List.indexedMap toHtmlCircle 
@@ -450,12 +326,11 @@ toHtmlCircle ix buttonP =
       GiveUpButton -> (True, "Give Up")
     textEl = 
       span [] [ text value ]
-      :: if isGiveUpBtn then [] else [ span [] [ text <| String.fromInt ix ] ]
   in
     button 
       [ css
           [ circleIconCss 
-              (px (appSize.hintBannerHeight.numericValue))
+              (px (H.appSize.hintBannerHeight.numericValue))
           , fontWeight bold
           , backgroundColor theme.primary.l5
           , color (if isGiveUpBtn then theme.secondary.l3 else white)
@@ -464,7 +339,35 @@ toHtmlCircle ix buttonP =
           ]
       , onClick OpenHint
       ]
-      textEl
+      [ textEl ]
+
+helpScreen : Bool -> Html Msg
+helpScreen isVisible =
+   H.popup 
+    isVisible
+    H.Info
+      [ h2 
+        [ css 
+            [ fontSize (rem <| size 4 )  
+            , color theme.secondary.l3
+            , property "grid-column" "1 / 3"
+            , marg H.Bottom 4
+            ]
+        ]
+        [ text "HOW TO PLAY" ]
+      , div 
+          [ css
+            [
+              color white
+            , property "grid-column" "1 / 3"
+            ]
+          ]
+          <|
+            List.map 
+              (text >> List.singleton >> div [ css [ marg Bottom 1 ]])
+              [ "One day, one player", "Cheating is for losers", "You start with 10 points.", "Each wrong guess will deduct 1 point from your total score", "You can buy a hint, it will cost you 2 points", "Share your final score with your friends", "Click on your player’s name to learn more about him/her.", "Sometimes stats are not 100% accurate (especially for players still playing),. We do apologise but it’s just a game so get over it please ;-)" ]
+      ]
+   
 
 hintScreen : HintModel -> Html Msg
 hintScreen { active } =
@@ -477,38 +380,14 @@ hintScreen { active } =
           [ border3 (px 1) solid black ]
       ]
   in
-    div 
-      [ css
-        [ position absolute
-        , width (px 320)
-        , height (px 500)
-        , border3 (px 1) solid black
-        , marginTop (rem 1)
-        , backgroundColor white
-        , transform <| translate (px <| if active then 0 else 320)
-        , zIndex (Css.int 2)
-        , top (px 0)
-        , paddingTop appSize.logoBannerHeight
-        , padding X 2
-        , boxSizing borderBox
-        , property "display" "grid"
-        , gridTemplateColumns [ Fr, Fr ]
-        , gridTemplateRows [ Auto, Auto, Fr ]
-        , property "justify-items" "center"
-        , property "align-items" "start"
-        , textAlign center
-        , T.transition
-            [ T.transform3 200 0 T.linear
-            ]
-        ]
-      ]
+    H.popup active H.Question
       [ h2 
         [ css 
             [ fontSize (rem <| size 4 )  
             , color white
             , backgroundColor theme.primary.l5
             , property "grid-column" "1 / 3"
-            , margin Bottom 4
+            , marg H.Bottom 4
             ]
         ]
         [ text "Wanna know the total characters in your player’s name?" ]
