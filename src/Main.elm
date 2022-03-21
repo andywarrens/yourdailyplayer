@@ -22,6 +22,7 @@ type alias Model =
   , score   : Int
   , guesses : List String
   , hint1   : Maybe Hint
+  , hint2   : Maybe Hint
   , showHelp : Bool
   , showHint : Maybe Hint
   }
@@ -88,14 +89,16 @@ update action old =
         }
 
 initialModel : Model
-initialModel = Model 
-  "An" 
-  Playing 
-  gameModel.initialScore 
-  [] 
-  Nothing
-  False
-  Nothing
+initialModel =
+  { userInput = "An"
+  , state     = Playing
+  , score     = gameModel.initialScore
+  , guesses   = []
+  , hint1     = Just gameModel.hint1
+  , hint2     = Nothing
+  , showHelp  = False
+  , showHint  = Nothing
+  }
 
 view : Model -> Html Msg
 view model =
@@ -114,7 +117,7 @@ view model =
       [ logoBanner
       , puzzleContent
       , puzzleInput model
-      , hintSection
+      , hintSection model
       -- popups
       , finishedOverlay showGameover model.state
       , helpScreen model.showHelp
@@ -318,8 +321,8 @@ scoreCircle { score } =
 
 
 
-hintSection : Html Msg
-hintSection = div 
+hintSection : Model -> Html Msg
+hintSection model = div 
   [ css
       [ displayFlex
       , alignItems center
@@ -329,35 +332,58 @@ hintSection = div
       ]
   ]
   <| List.map toHtmlCircle 
-    [ HintButton gameModel.hint1
-    , HintButton gameModel.hint2
+    [ HintButton gameModel.hint1 model.hint1
+    , HintButton gameModel.hint2 model.hint2
     , GiveUpButton
     ]
 
-type HintSectionButton = HintButton Hint | GiveUpButton
+type HintSectionButton = HintButton Hint (Maybe Hint) | GiveUpButton
 
 toHtmlCircle : HintSectionButton -> Html Msg
 toHtmlCircle buttonP = 
   let
     (isGiveUpBtn, value, action) = case buttonP of
-      HintButton hint -> (False, "Hint", OpenHint hint)
-      GiveUpButton -> (True, "Give Up", GiveUp)
+      HintButton hint Nothing -> (False, "Hint", Just <| OpenHint hint)
+      HintButton _ (Just _) -> (False, "Hint", Nothing)
+      GiveUpButton -> (True, "Give Up", Just <| GiveUp)
     textEl = 
       span [] [ text value ]
-  in
-    button 
-      [ css
+    cssHint = css <|
+          (case action of
+              Just _ -> [ backgroundColor theme.primary.l5
+                        , cursor pointer ]
+              Nothing -> [ backgroundColor theme.primary.l1 ])
+          ++
           [ circleIconCss 
               (px (H.appSize.hintBannerHeight.numericValue))
           , fontWeight bold
-          , backgroundColor theme.primary.l5
+          , backgroundColor <| case action of
+              Just _ -> theme.primary.l5
+              Nothing -> theme.primary.l1
           , color (if isGiveUpBtn then theme.secondary.l3 else white)
           , borderWidth (px 0)
-          , cursor pointer
+          , position relative
           ]
-      , onClick action
-      ]
-      [ textEl ]
+    maybeOnClickHint = case action of 
+        Just x ->  [ onClick x ]
+        Nothing -> []
+    maybeActiveDot = case action of
+        Just _ ->  []
+        Nothing -> [ 
+          span 
+            [ css 
+              [ backgroundColor theme.secondary.l3
+              , position absolute
+              , top (px 0)
+              , right (px 0)
+              ]
+            ]
+            []
+          ]
+  in
+    button 
+      ( cssHint :: maybeOnClickHint )
+      ( textEl :: maybeActiveDot )
 
 helpScreen : Bool -> Html Msg
 helpScreen isVisible =
