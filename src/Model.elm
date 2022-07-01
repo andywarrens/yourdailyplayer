@@ -3,10 +3,15 @@ module Model exposing (..)
 import Css exposing (Color, hsl, hex)
 
 type InputType = Key String | Backspace | Enter
-type Hint = CharCount Int | Nationality String
+type HintType = CharCount Int | Nationality String
+type alias HintPrice = Int
+type alias Hint = 
+  { price: HintPrice
+  , ix: Int
+  , hintType: HintType }
 type Msg = 
     Input InputType 
-  | OpenHint Hint | CloseHint
+  | OpenHint Hint | BuyHint Hint | CloseHint 
   | GiveUp
   | ToggleHelp Bool
 

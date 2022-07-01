@@ -21,8 +21,8 @@ type alias Model =
   , state   : GameState
   , score   : Int
   , guesses : List String
-  , hint1   : Maybe Hint
-  , hint2   : Maybe Hint
+  , isHint1Bought : Bool
+  , isHint2Bought : Bool
   , showHelp : Bool
   , showHint : Maybe Hint
   }
@@ -39,8 +39,8 @@ gameModel =
   { answer   = "Andy"
   , nGuesses = 5
   , initialScore = 10
-  , hint1 = CharCount 4
-  , hint2 = Nationality "Belg"
+  , hint1 = { ix = 1, price = 2, hintType = CharCount 4 }
+  , hint2 = { ix = 2, price = 2, hintType = Nationality "Belg" }
   }
 
 main : Program () Model Msg
@@ -55,6 +55,19 @@ update : Msg -> Model -> Model
 update action old =
   case action of 
     OpenHint x -> { old | showHint = Just x }
+    BuyHint {ix, price} -> 
+      let
+        isHint1Bought = case ix of 
+          1 -> True
+          _ -> old.isHint1Bought
+        isHint2Bought = case ix of 
+          1 -> old.isHint2Bought
+          _ -> True
+      in 
+          { old | showHint = Nothing
+                , score = old.score - price
+                , isHint1Bought = isHint1Bought
+                , isHint2Bought = isHint2Bought }
     CloseHint -> { old | showHint = Nothing }
     ToggleHelp isVisible -> { old | showHelp = isVisible }
     GiveUp -> { old | state = GameOver }
@@ -94,8 +107,8 @@ initialModel =
   , state     = Playing
   , score     = gameModel.initialScore
   , guesses   = []
-  , hint1     = Just gameModel.hint1
-  , hint2     = Nothing
+  , isHint1Bought = False
+  , isHint2Bought = False
   , showHelp  = False
   , showHint  = Nothing
   }
@@ -114,15 +127,17 @@ view model =
           ]
       , class "full-page"
       ]
-      [ logoBanner
+      ([ logoBanner
       , puzzleContent
       , puzzleInput model
       , hintSection model
       -- popups
       , finishedOverlay showGameover model.state
-      , helpScreen model.showHelp
-      , hintScreen model.showHint
-      ]
+      , helpScreen model.showHelp ]
+      ++ (case model.showHint of
+            Just x  -> [hintScreen x]
+            Nothing -> [])
+      )
 
 finishedOverlay : Bool -> GameState -> Html Msg
 finishedOverlay isVisible state =
@@ -332,19 +347,19 @@ hintSection model = div
       ]
   ]
   <| List.map toHtmlCircle 
-    [ HintButton gameModel.hint1 model.hint1
-    , HintButton gameModel.hint2 model.hint2
+    [ HintButton gameModel.hint1 model.isHint1Bought
+    , HintButton gameModel.hint2 model.isHint2Bought
     , GiveUpButton
     ]
 
-type HintSectionButton = HintButton Hint (Maybe Hint) | GiveUpButton
+type HintSectionButton = HintButton Hint Bool | GiveUpButton
 
 toHtmlCircle : HintSectionButton -> Html Msg
 toHtmlCircle buttonP = 
   let
     (isGiveUpBtn, value, action) = case buttonP of
-      HintButton hint Nothing -> (False, "Hint", Just <| OpenHint hint)
-      HintButton _ (Just _) -> (False, "Hint", Nothing)
+      HintButton hint False -> (False, "Hint", Just <| OpenHint hint)
+      HintButton _ True -> (False, "Hint", Nothing)
       GiveUpButton -> (True, "Give Up", Just <| GiveUp)
     textEl = 
       span [] [ text value ]
@@ -413,7 +428,7 @@ helpScreen isVisible =
       ]
    
 
-hintScreen : Maybe Hint -> Html Msg
+hintScreen : Hint -> Html Msg
 hintScreen hint =
   let 
     uncontainedBtn = styled button 
@@ -423,10 +438,10 @@ hintScreen hint =
       , hover
           [ border3 (px 1) solid black ]
       ]
-    (active, question) = case hint of
-      Just (CharCount _) -> (True, "Wanna know the total characters in your player’s name?")
-      Just (Nationality _) -> (True, "Wanna know your player’s nationality?")
-      Nothing -> (False, "")
+    hintType = hint.hintType
+    (active, question) = case hintType of
+        (CharCount _) -> (True, "Wanna know the total characters in your player’s name?")
+        (Nationality _) -> (True, "Wanna know your player’s nationality?")
   in
     popup active Question
       [ h2 
@@ -441,7 +456,7 @@ hintScreen hint =
         [ text question]
       , uncontainedBtn 
           [ css [ color theme.secondary.l3 ]
-          , onClick CloseHint
+          , onClick (BuyHint hint)
           ]
           [ text "YES" ]
       , uncontainedBtn 
