@@ -9,11 +9,52 @@ type alias Hint =
   { price: HintPrice
   , ix: Int
   , hintType: HintType }
+
 type Msg = 
     Input InputType 
   | OpenHint Hint | BuyHint Hint | CloseHint 
   | GiveUp
   | ToggleHelp Bool
+
+type GameState = Playing | GameOver | Won
+type alias Model =
+  { userInput: String
+  , state   : GameState
+  , score   : Int
+  , guesses : List String
+  , isHint1Bought : Bool
+  , isHint2Bought : Bool
+  , showHelp : Bool
+  , showHint : Maybe Hint
+  }
+type alias GameModel =
+  { answer : String
+  , nGuesses : Int
+  , initialScore : Int 
+  , hint1 : Hint
+  , hint2 : Hint
+  }
+
+initialModel : Model
+initialModel =
+  { userInput = "An"
+  , state     = Playing
+  , score     = gameModel.initialScore
+  , guesses   = []
+  , isHint1Bought = False
+  , isHint2Bought = False
+  , showHelp  = False
+  , showHint  = Nothing
+  }
+
+gameModel : GameModel
+gameModel = 
+  { answer   = "Andy"
+  , nGuesses = 5
+  , initialScore = 10
+  , hint1 = { ix = 1, price = 2, hintType = CharCount 4 }
+  , hint2 = { ix = 2, price = 2, hintType = Nationality "Belg" }
+  }
 
 type alias ThemeColor =
   { l1: Color

@@ -16,46 +16,6 @@ import Views.Helpers exposing (uncontained, circleIconCss, marg)
 import Views.Helpers exposing (popup, PopupType(..))
 
 
-type alias Model =
-  { userInput: String
-  , state   : GameState
-  , score   : Int
-  , guesses : List String
-  , isHint1Bought : Bool
-  , isHint2Bought : Bool
-  , showHelp : Bool
-  , showHint : Maybe Hint
-  }
-type GameState = Playing | GameOver | Won
-type alias GameModel =
-  { answer : String
-  , nGuesses : Int
-  , initialScore : Int 
-  , hint1 : Hint
-  , hint2 : Hint
-  }
-
-initialModel : Model
-initialModel =
-  { userInput = "An"
-  , state     = Playing
-  , score     = gameModel.initialScore
-  , guesses   = []
-  , isHint1Bought = False
-  , isHint2Bought = False
-  , showHelp  = False
-  , showHint  = Nothing
-  }
-
-gameModel : GameModel
-gameModel = 
-  { answer   = "Andy"
-  , nGuesses = 5
-  , initialScore = 10
-  , hint1 = { ix = 1, price = 2, hintType = CharCount 4 }
-  , hint2 = { ix = 2, price = 2, hintType = Nationality "Belg" }
-  }
-
 main : Program () Model Msg
 main =
     Browser.sandbox
@@ -242,9 +202,7 @@ puzzleInput : Model -> Html Msg
 puzzleInput model = 
   let
     guesses = String.length model.userInput
-    fullHiddenAnswer = List.range 0 (String.length gameModel.answer)
-      |> List.map (\_ -> "") 
-      |> String.join "."
+    fullHiddenAnswer =  List.repeat (String.length gameModel.answer) "." |> String.join ""
     hiddenAnswerPart = List.drop guesses (String.toList fullHiddenAnswer)
     userAnswer = model.userInput ++ String.fromList hiddenAnswerPart
   in
