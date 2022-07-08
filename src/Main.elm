@@ -27,14 +27,27 @@ type alias Model =
   , showHint : Maybe Hint
   }
 type GameState = Playing | GameOver | Won
-
-gameModel : 
+type alias GameModel =
   { answer : String
-  , nGuesses : number
+  , nGuesses : Int
   , initialScore : Int 
   , hint1 : Hint
   , hint2 : Hint
   }
+
+initialModel : Model
+initialModel =
+  { userInput = "An"
+  , state     = Playing
+  , score     = gameModel.initialScore
+  , guesses   = []
+  , isHint1Bought = False
+  , isHint2Bought = False
+  , showHelp  = False
+  , showHint  = Nothing
+  }
+
+gameModel : GameModel
 gameModel = 
   { answer   = "Andy"
   , nGuesses = 5
@@ -101,17 +114,8 @@ update action old =
         , guesses = newGuesses
         }
 
-initialModel : Model
-initialModel =
-  { userInput = "An"
-  , state     = Playing
-  , score     = gameModel.initialScore
-  , guesses   = []
-  , isHint1Bought = False
-  , isHint2Bought = False
-  , showHelp  = False
-  , showHint  = Nothing
-  }
+-- View functions
+-- ----------------------------------------
 
 view : Model -> Html Msg
 view model =
@@ -169,7 +173,6 @@ logoBanner =
     , fbPlayerLogo
     ]
 
-
 fbPlayerLogo : Html msg
 fbPlayerLogo =
     div 
@@ -195,7 +198,6 @@ helpButton =
       ]
       [ text "?" ]
 
-
 yourDailyPlayerText : Html msg
 yourDailyPlayerText =
     div 
@@ -214,8 +216,6 @@ yourDailyPlayerText =
               ] 
               [ text "Player"]
       ]
-
-  
 
 puzzleContent : Html msg
 puzzleContent = 
@@ -295,7 +295,6 @@ keyboard =
     [ text "↩" ]
   ]
 
-
 keyboardInput : String -> Html Msg
 keyboardInput letters =
   div []
@@ -334,8 +333,6 @@ scoreCircle { score } =
     ]
     [ text <| String.fromInt score ]
 
-
-
 hintSection : Model -> Html Msg
 hintSection model = div 
   [ css
@@ -353,7 +350,6 @@ hintSection model = div
     ]
 
 type HintSectionButton = HintButton Hint Bool | GiveUpButton
-
 toHtmlCircle : HintSectionButton -> Html Msg
 toHtmlCircle buttonP = 
   let
@@ -475,6 +471,12 @@ infoToText info =
   , span [] [ text info.goals ]
   ]
 
+type alias Info =
+ { year: String
+ , team: String
+ , number: String
+ , goals: String
+ }
 puzzleInfo : List Info
 puzzleInfo = 
   [ Info "1995–1997" "Chemnitzer FC II" "18" "(5)"
@@ -486,10 +488,3 @@ puzzleInfo =
   , Info "2006–2010" "Chelsea" "105" "(17)"
   , Info "2010–2012" "Bayer Leverkusen" "35" "(2)"
   ]
-
-type alias Info =
- { year: String
- , team: String
- , number: String
- , goals: String
- }
