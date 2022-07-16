@@ -67,6 +67,7 @@ type alias ThemeColor =
 theme : 
   { secondary : ThemeColor
   , primary   : ThemeColor
+  , gray      : ThemeColor
   }
 theme =
     { primary = ThemeColor
@@ -81,6 +82,12 @@ theme =
         (hsl 29 0.90 0.45)
         (hsl 29 0.90 0.30)
         (hsl 29 0.90 0.15)
+    , gray = ThemeColor
+        (hsl 0 0 0.85)
+        (hsl 0 0 0.65)
+        (hsl 0 0 0.45)
+        (hsl 0 0 0.30)
+        (hsl 0 0 0.15)
     }
 
 white : Color

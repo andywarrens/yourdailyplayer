@@ -10,11 +10,12 @@ import Css exposing (..)
 import Browser
 
 import Views.Helpers as H
+import Views.Components.Buttons exposing (roundButton)
 import Model exposing (..)
 import Views.Helpers exposing (padd, size, Direction(..))
 import Views.Helpers exposing (uncontained, circleIconCss, marg)
 import Views.Helpers exposing (popup, PopupType(..))
-
+import Html.Styled exposing (Attribute)
 
 main : Program () Model Msg
 main =
@@ -306,59 +307,49 @@ hintSection model = div
       , height H.appSize.hintBannerHeight
       ]
   ]
-  <| List.map toHtmlCircle 
-    [ HintButton gameModel.hint1 model.isHint1Bought
-    , HintButton gameModel.hint2 model.isHint2Bought
-    , GiveUpButton
+   
+    [ toHintButton gameModel.hint1 model.isHint1Bought
+    , toHintButton gameModel.hint2 model.isHint2Bought
+    , giveUpButton
     ]
 
-type HintSectionButton = HintButton Hint Bool | GiveUpButton
-toHtmlCircle : HintSectionButton -> Html Msg
-toHtmlCircle buttonP = 
-  case buttonP of
-    HintButton hint isBought ->
-      let
-        action = if isBought then Nothing else Just (OpenHint hint)
-        textEl = span [] [ text "Hint" ]
-        cssHint = css <|
-              (case action of
-                  Just _ -> [ backgroundColor theme.primary.l5
-                            , cursor pointer ]
-                  Nothing -> [ backgroundColor theme.primary.l1 ])
-              ++
-              [ circleIconCss 
-                  (px (H.appSize.hintBannerHeight.numericValue))
-              , fontWeight bold
-              , backgroundColor <| case action of
-                  Just _ -> theme.primary.l5
-                  Nothing -> theme.primary.l1
-              , color white
-              , borderWidth (px 0)
-              , position relative
-              ]
-        maybeOnClickHint = case action of 
-            Just x ->  [ onClick x ]
-            Nothing -> []
-        maybeActiveDot = case action of
-            Just _ ->  []
-            Nothing -> [ 
-              span 
-                [ css 
-                  [ backgroundColor theme.secondary.l3
-                  , position absolute
-                  , top (px 0)
-                  , right (px 0)
-                  ]
-                ]
-                []
-              ]
-      in
-        button 
-          ( cssHint :: maybeOnClickHint )
-          ( textEl :: maybeActiveDot )
+toHintButton : Hint -> Bool -> Html Msg
+toHintButton hint isBought = 
+  let
+    finalCss = css <|
+      (roundButton 
+        white 
+        (if isBought then theme.primary.l1 else theme.primary.l5)
+        H.appSize.hintBannerHeight.numericValue)
+      ++ 
+        (if isBought then [] else [ cursor pointer ])
+    in
+      if isBought then
+        button [ finalCss ] [ span [] [ text "Hint" ] ]
+      else
+        let
+          hintBoughtLabel = case hint.hintType of
+            CharCount x -> String.fromInt x
+            Nationality x -> x
+          textEl = span 
+            [ css [ color theme.gray.l2 ] ]
+            [ text hintBoughtLabel ]
+        in
+          button 
+            ( finalCss :: [ onClick (OpenHint hint) ] )
+            [ textEl ]
 
-    GiveUpButton -> 
-      button [] [ text "GiveUp" ]
+giveUpButton = 
+  let
+    finalCss = css <|
+      (roundButton 
+        white 
+        theme.secondary.l3 
+        H.appSize.hintBannerHeight.numericValue)
+  in
+    button 
+      ( finalCss :: [onClick GiveUp] )
+      [ text "GiveUp" ]
 
 helpScreen : Bool -> Html Msg
 helpScreen isVisible =
