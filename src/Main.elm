@@ -202,9 +202,14 @@ puzzleInput : Model -> Html Msg
 puzzleInput model = 
   let
     guesses = String.length model.userInput
-    fullHiddenAnswer =  List.repeat (String.length gameModel.answer) "." |> String.join ""
-    hiddenAnswerPart = List.drop guesses (String.toList fullHiddenAnswer)
-    userAnswer = model.userInput ++ String.fromList hiddenAnswerPart
+    userAnswer = if model.isHint1Bought then
+        let
+          fullHiddenAnswer = List.repeat (String.length gameModel.answer) "." |> String.join ""
+          hiddenAnswerPart = List.drop guesses (String.toList fullHiddenAnswer)
+        in
+          model.userInput ++ String.fromList hiddenAnswerPart
+      else
+        model.userInput
   in
     div 
       [ css
@@ -310,49 +315,50 @@ hintSection model = div
 type HintSectionButton = HintButton Hint Bool | GiveUpButton
 toHtmlCircle : HintSectionButton -> Html Msg
 toHtmlCircle buttonP = 
-  let
-    (isGiveUpBtn, value, action) = case buttonP of
-      HintButton hint False -> (False, "Hint", Just <| OpenHint hint)
-      HintButton _ True -> (False, "Hint", Nothing)
-      GiveUpButton -> (True, "Give Up", Just <| GiveUp)
-    textEl = 
-      span [] [ text value ]
-    cssHint = css <|
-          (case action of
-              Just _ -> [ backgroundColor theme.primary.l5
-                        , cursor pointer ]
-              Nothing -> [ backgroundColor theme.primary.l1 ])
-          ++
-          [ circleIconCss 
-              (px (H.appSize.hintBannerHeight.numericValue))
-          , fontWeight bold
-          , backgroundColor <| case action of
-              Just _ -> theme.primary.l5
-              Nothing -> theme.primary.l1
-          , color (if isGiveUpBtn then theme.secondary.l3 else white)
-          , borderWidth (px 0)
-          , position relative
-          ]
-    maybeOnClickHint = case action of 
-        Just x ->  [ onClick x ]
-        Nothing -> []
-    maybeActiveDot = case action of
-        Just _ ->  []
-        Nothing -> [ 
-          span 
-            [ css 
-              [ backgroundColor theme.secondary.l3
-              , position absolute
-              , top (px 0)
-              , right (px 0)
+  case buttonP of
+    HintButton hint isBought ->
+      let
+        action = if isBought then Nothing else Just (OpenHint hint)
+        textEl = span [] [ text "Hint" ]
+        cssHint = css <|
+              (case action of
+                  Just _ -> [ backgroundColor theme.primary.l5
+                            , cursor pointer ]
+                  Nothing -> [ backgroundColor theme.primary.l1 ])
+              ++
+              [ circleIconCss 
+                  (px (H.appSize.hintBannerHeight.numericValue))
+              , fontWeight bold
+              , backgroundColor <| case action of
+                  Just _ -> theme.primary.l5
+                  Nothing -> theme.primary.l1
+              , color white
+              , borderWidth (px 0)
+              , position relative
               ]
-            ]
-            []
-          ]
-  in
-    button 
-      ( cssHint :: maybeOnClickHint )
-      ( textEl :: maybeActiveDot )
+        maybeOnClickHint = case action of 
+            Just x ->  [ onClick x ]
+            Nothing -> []
+        maybeActiveDot = case action of
+            Just _ ->  []
+            Nothing -> [ 
+              span 
+                [ css 
+                  [ backgroundColor theme.secondary.l3
+                  , position absolute
+                  , top (px 0)
+                  , right (px 0)
+                  ]
+                ]
+                []
+              ]
+      in
+        button 
+          ( cssHint :: maybeOnClickHint )
+          ( textEl :: maybeActiveDot )
+
+    GiveUpButton -> 
+      button [] [ text "GiveUp" ]
 
 helpScreen : Bool -> Html Msg
 helpScreen isVisible =
